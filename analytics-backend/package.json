@@ -1,0 +1,14 @@
+{
+  "name": "analytics-service",
+  "version": "1.0.0",
+  "description": "Service to track web analytics for Lugx Gaming",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@clickhouse/client": "^1.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  }
+}

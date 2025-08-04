@@ -1,0 +1,132 @@
+# Fixed Superset deployment - CORS issue resolved
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: superset-config
+  namespace: default
+data:
+  superset_config.py: |
+    # Simple configuration without CORS to avoid flask-cors dependency issues
+    SECRET_KEY = 'superset-analytics-secret-key-2024'
+    SQLALCHEMY_DATABASE_URI = 'sqlite:////app/superset_home/superset.db'
+    
+    # Enable ClickHouse features
+    FEATURE_FLAGS = {
+        'ENABLE_TEMPLATE_PROCESSING': True,
+        'DASHBOARD_NATIVE_FILTERS': True,
+        'DASHBOARD_CROSS_FILTERS': True,
+    }
+    
+    # Performance settings for user analytics
+    ROW_LIMIT = 50000
+    VIZ_ROW_LIMIT = 10000
+    SQLLAB_TIMEOUT = 300
+    SUPERSET_WEBSERVER_TIMEOUT = 300
+    
+    # Disable CSRF for easier setup (you can enable later if needed)
+    WTF_CSRF_ENABLED = False
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: superset
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: superset
+  template:
+    metadata:
+      labels:
+        app: superset
+    spec:
+      containers:
+      - name: superset
+        image: apache/superset:latest
+        ports:
+        - containerPort: 8088
+        
+        env:
+        - name: SUPERSET_CONFIG_PATH
+          value: /app/pythonpath/superset_config.py
+        
+        volumeMounts:
+        - name: config
+          mountPath: /app/pythonpath
+        - name: superset-home
+          mountPath: /app/superset_home
+        
+        command: ["/bin/bash"]
+        args: 
+        - -c
+        - |
+          echo "🚀 Installing dependencies..."
+          pip install clickhouse-connect flask-cors
+          
+          echo "📊 Initializing analytics database..."
+          superset db upgrade
+          
+          echo "👤 Creating admin user..."
+          superset fab create-admin \
+              --username admin \
+              --firstname Analytics \
+              --lastname Admin \
+              --email admin@analytics.com \
+              --password admin123 || echo "Admin user might already exist"
+          
+          echo "🔧 Initializing Superset..."
+          superset init
+          
+          echo "✅ Starting User Analytics Dashboard..."
+          superset run -p 8088 --host=0.0.0.0
+        
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+            
+        # Health checks with longer timeouts
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8088
+          initialDelaySeconds: 300
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+          
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8088
+          initialDelaySeconds: 120
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          
+      volumes:
+      - name: config
+        configMap:
+          name: superset-config
+      - name: superset-home
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: superset
+  namespace: default
+spec:
+  selector:
+    app: superset
+  ports:
+  - port: 8088
+    targetPort: 8088
+  type: LoadBalancer

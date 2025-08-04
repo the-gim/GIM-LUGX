@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gim-web
+spec:
+  replicas: 2  # You can increase this based on the load
+  selector:
+    matchLabels:
+      app: gim-web
+  template:
+    metadata:
+      labels:
+        app: gim-web
+    spec:
+      containers:
+      - name: gim-web
+        image: gimgim/gim-web:latest  # Ensure this is the correct image in DockerHub or your registry
+        ports:
+        - containerPort: 80
+        env:
+        - name: API_URL
+          value: "http://analytics-service:8080"  # Replace with your backend service URL if different

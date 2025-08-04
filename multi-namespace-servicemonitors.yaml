@@ -1,0 +1,80 @@
+# ServiceMonitor for Default Namespace Services
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: default-services
+  namespace: monitoring
+  labels:
+    app: default-services
+spec:
+  namespaceSelector:
+    matchNames:
+    - default
+  selector:
+    matchLabels: {}
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
+
+---
+# ServiceMonitor for lugx-gaming namespace
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: lugx-gaming-services
+  namespace: monitoring
+  labels:
+    app: lugx-gaming-services
+spec:
+  namespaceSelector:
+    matchNames:
+    - lugx-gaming
+  selector:
+    matchLabels: {}
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
+
+---
+# ClusterRole to allow Prometheus to access all namespaces
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus-multi-namespace
+rules:
+- apiGroups: [""]
+  resources:
+  - nodes
+  - nodes/proxy
+  - services
+  - endpoints
+  - pods
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources:
+  - configmaps
+  verbs: ["get"]
+- apiGroups:
+  - extensions
+  resources:
+  - ingresses
+  verbs: ["get", "list", "watch"]
+- nonResourceURLs: ["/metrics"]
+  verbs: ["get"]
+
+---
+# ClusterRoleBinding for multi-namespace access
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus-multi-namespace
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-multi-namespace
+subjects:
+- kind: ServiceAccount
+  name: prometheus
+  namespace: monitoring

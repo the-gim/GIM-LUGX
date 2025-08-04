@@ -1,0 +1,10 @@
+﻿{
+  "spec": {
+    "strategy": {
+      "rollingUpdate": {
+        "maxUnavailable": 0,
+        "maxSurge": 1
+      }
+    }
+  }
+}

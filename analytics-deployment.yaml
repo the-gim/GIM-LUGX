@@ -1,0 +1,104 @@
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: analytics-service
+#   labels:
+#     app: analytics-service
+# spec:
+#   replicas: 2
+#   selector:
+#     matchLabels:
+#       app: analytics-service
+#   template:
+#     metadata:
+#       labels:
+#         app: analytics-service
+#     spec:
+#       containers:
+#         - name: analytics-service
+#           image: gimgim/analytics-service:latest    # Your real backend image here
+#           ports:
+#             - containerPort: 8080                     # Your backend app port
+#           env:
+#             - name: CLICKHOUSE_URL
+#               value: "http://clickhouse-service:8123"
+#             - name: CLICKHOUSE_HOST
+#               value: "clickhouse-service"
+#             - name: CLICKHOUSE_PORT
+#               value: "8123"
+#           resources:
+#             requests:
+#               memory: "256Mi"
+#               cpu: "250m"
+#             limits:
+#               memory: "512Mi"
+#               cpu: "500m"
+
+
+
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: analytics-service
+#   labels:
+#     app: analytics
+# spec:
+#   replicas: 2
+#   selector:
+#     matchLabels:
+#       app: analytics
+#   template:
+#     metadata:
+#       labels:
+#         app: analytics
+#     spec:
+#       containers:
+#       - name: analytics-service
+#         image: gimgim/analytics-service:latest
+#         ports:
+#         - containerPort: 8080                # <-- Make sure this matches Node.js port
+#         env:
+#         - name: CLICKHOUSE_URL
+#           value: "http://clickhouse-service:8123"  # Full URL expected by your client lib
+#         resources:
+#           requests:
+#             memory: "256Mi"
+#             cpu: "250m"
+#           limits:
+#             memory: "512Mi"
+#             cpu: "500m"
+
+
+
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  labels:
+    app: analytics-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+    spec:
+      containers:
+        - name: analytics-service
+          image: gimgim/analytics-service:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: CLICKHOUSE_HOST
+              value: "acfc5e0349f8f4ff4955f1b0ce258b29-1078777489.us-east-1.elb.amazonaws.com"
+            - name: CLICKHOUSE_PORT
+              value: "8123"
+            - name: CLICKHOUSE_USER
+              value: "default"
+            - name: CLICKHOUSE_PASSWORD
+              value: "password"

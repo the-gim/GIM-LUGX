@@ -1,0 +1,116 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  labels:
+    app: analytics-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+    spec:
+      containers:
+      - name: analytics-service
+        image: node:18-alpine
+        command: ["/bin/sh"]
+        args: 
+        - "-c"
+        - |
+          cd /app
+          cat > package.json << 'EOF'
+          {
+            "name": "analytics-service",
+            "version": "1.0.0",
+            "main": "app.js",
+            "dependencies": {
+              "express": "^4.18.2",
+              "cors": "^2.8.5"
+            }
+          }
+          EOF
+          
+          cat > app.js << 'EOF'
+          const express = require('express');
+          const cors = require('cors');
+          const { exec } = require('child_process');
+          
+          const app = express();
+          app.use(cors());
+          app.use(express.json());
+          
+          app.get('/health', (req, res) => {
+            res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+          });
+          
+          app.post('/api/analytics', async (req, res) => {
+            try {
+              const data = req.body;
+              console.log('Analytics event received:', data.type);
+              
+              let query = '';
+              if (data.type === 'page_view') {
+                query = `INSERT INTO analytics.page_views (session_id, user_id, page_url, page_title) VALUES ('${data.session_id}', '${data.user_id}', '${data.page_url}', '${data.page_title}')`;
+              } else if (data.type === 'click') {
+                query = `INSERT INTO analytics.clicks (session_id, user_id, page_url, element_type, element_text, click_x, click_y) VALUES ('${data.session_id}', '${data.user_id}', '${data.page_url}', '${data.element_type}', '${data.element_text}', ${data.click_x}, ${data.click_y})`;
+              } else if (data.type === 'scroll') {
+                query = `INSERT INTO analytics.scroll_events (session_id, user_id, page_url, scroll_depth_percent, page_height, viewport_height) VALUES ('${data.session_id}', '${data.user_id}', '${data.page_url}', ${data.scroll_depth_percent}, ${data.page_height}, ${data.viewport_height})`;
+              }
+              
+              if (query) {
+                exec(`echo "${query}" | wget -qO- --post-data="@-" http://clickhouse-service:8123/`, (error, stdout, stderr) => {
+                  if (error) {
+                    console.error('ClickHouse error:', error);
+                    res.status(500).json({ error: error.message });
+                  } else {
+                    console.log('Data inserted successfully');
+                    res.json({ success: true });
+                  }
+                });
+              } else {
+                res.json({ success: true, message: 'Unknown event type' });
+              }
+            } catch (error) {
+              console.error('Error:', error);
+              res.status(500).json({ error: error.message });
+            }
+          });
+          
+          app.listen(8080, () => {
+            console.log('Analytics service running on port 8080');
+          });
+          EOF
+          
+          npm install
+          node app.js
+        ports:
+        - containerPort: 8080
+        env:
+        - name: CLICKHOUSE_URL
+          value: "http://clickhouse-service:8123"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  labels:
+    app: analytics-service
+spec:
+  selector:
+    app: analytics-service
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
